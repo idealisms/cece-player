@@ -205,6 +205,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         hideSystemUI()
+        try { startLockTask() } catch (_: Exception) {}
         // Re-hide after any transient reveal
         window.decorView.setOnSystemUiVisibilityChangeListener {
             handler.removeCallbacks(hideSystemUiRunnable)
