@@ -13,10 +13,12 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
 import android.view.View
+import android.view.ViewTreeObserver
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -61,6 +63,24 @@ class MainActivity : AppCompatActivity() {
         centerContainer.setOnClickListener { togglePlayPause() }
         btnPrev.setOnClickListener { playPrev() }
         btnNext.setOnClickListener { playNext() }
+
+        // Make prev/next buttons true circles (constrain height = width after layout)
+        btnPrev.viewTreeObserver.addOnGlobalLayoutListener(object : ViewTreeObserver.OnGlobalLayoutListener {
+            override fun onGlobalLayout() {
+                btnPrev.viewTreeObserver.removeOnGlobalLayoutListener(this)
+                val size = btnPrev.width
+                if (size > 0) {
+                    val reduced = (size * 0.7).toInt()
+                    for (btn in listOf(btnPrev, btnNext)) {
+                        val p = btn.layoutParams as LinearLayout.LayoutParams
+                        p.width = reduced
+                        p.height = reduced
+                        p.weight = 0f
+                        btn.layoutParams = p
+                    }
+                }
+            }
+        })
 
         requestPermissionsAndLoad()
     }
