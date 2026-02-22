@@ -44,17 +44,44 @@
             android:textColor="@color/text_color"
             android:stateListAnimator="@null" />
 
-        <Button
-            android:id="@+id/btnPlay"
+        <FrameLayout
+            android:id="@+id/centerContainer"
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
             android:layout_margin="8dp"
-            android:background="@drawable/circle_btn_play"
-            android:text="▶"
-            android:textSize="48sp"
-            android:textColor="@color/text_color"
-            android:stateListAnimator="@null" />
+            android:clickable="true"
+            android:focusable="true">
+
+            <Button
+                android:id="@+id/btnPlay"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/circle_btn_play"
+                android:text="▶"
+                android:textSize="48sp"
+                android:textColor="@color/text_color"
+                android:stateListAnimator="@null" />
+
+            <ImageView
+                android:id="@+id/albumArt"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/pauseOverlay"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#88000000"
+                android:text="⏸"
+                android:textColor="#FFFFFF"
+                android:textSize="96sp"
+                android:gravity="center"
+                android:visibility="gone" />
+
+        </FrameLayout>
 
         <Button
             android:id="@+id/btnNext"

@@ -2,6 +2,9 @@ package com.cece.player
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
@@ -13,12 +16,15 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.widget.Button
+import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import java.io.File
 
-data class Track(val uri: Uri, val title: String, val album: String)
+data class Track(val uri: Uri, val title: String, val album: String, val dataPath: String)
 
 class MainActivity : AppCompatActivity() {
 
@@ -28,7 +34,10 @@ class MainActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
 
     private lateinit var trackInfo: TextView
+    private lateinit var centerContainer: FrameLayout
     private lateinit var btnPlay: Button
+    private lateinit var albumArt: ImageView
+    private lateinit var pauseOverlay: TextView
     private lateinit var btnPrev: Button
     private lateinit var btnNext: Button
 
@@ -39,13 +48,17 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         trackInfo = findViewById(R.id.trackInfo)
+        centerContainer = findViewById(R.id.centerContainer)
         btnPlay = findViewById(R.id.btnPlay)
+        albumArt = findViewById(R.id.albumArt)
+        pauseOverlay = findViewById(R.id.pauseOverlay)
         btnPrev = findViewById(R.id.btnPrev)
         btnNext = findViewById(R.id.btnNext)
 
         trackInfo.isSelected = true  // enables marquee scrolling
 
         btnPlay.setOnClickListener { togglePlayPause() }
+        centerContainer.setOnClickListener { togglePlayPause() }
         btnPrev.setOnClickListener { playPrev() }
         btnNext.setOnClickListener { playNext() }
 
@@ -53,16 +66,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestPermissionsAndLoad() {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_AUDIO
+        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            arrayOf(Manifest.permission.READ_MEDIA_AUDIO, Manifest.permission.READ_MEDIA_IMAGES)
         } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
+            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
 
-        if (ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED) {
+        val allGranted = permissions.all {
+            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+        }
+
+        if (allGranted) {
             loadTracks()
         } else {
-            ActivityCompat.requestPermissions(this, arrayOf(permission), 1)
+            ActivityCompat.requestPermissions(this, permissions, 1)
         }
     }
 
@@ -72,7 +89,7 @@ class MainActivity : AppCompatActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 1 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+        if (requestCode == 1 && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             loadTracks()
         } else {
             trackInfo.text = "Storage permission needed"
@@ -114,7 +131,7 @@ class MainActivity : AppCompatActivity() {
                     if (nextSlash > 0) afterCece.substring(0, nextSlash) else "Cece"
                 } else "Cece"
 
-                found.add(Track(uri, title, album))
+                found.add(Track(uri, title, album, fullPath))
             }
         }
 
@@ -144,6 +161,34 @@ class MainActivity : AppCompatActivity() {
             setOnCompletionListener { playNext() }
         }
         btnPlay.text = "⏸"
+        updateAlbumArt(isPlaying = true)
+    }
+
+    private fun updateAlbumArt(isPlaying: Boolean) {
+        if (tracks.isEmpty()) return
+        val pngPath = tracks[currentIndex].dataPath.substringBeforeLast(".") + ".png"
+        val bitmap = if (File(pngPath).exists()) BitmapFactory.decodeFile(pngPath) else null
+        if (bitmap != null) {
+            albumArt.visibility = View.VISIBLE
+            btnPlay.visibility = View.GONE
+            pauseOverlay.visibility = if (isPlaying) View.GONE else View.VISIBLE
+            albumArt.post {
+                val scale = minOf(
+                    albumArt.width / bitmap.width,
+                    albumArt.height / bitmap.height
+                ).coerceAtLeast(1)
+                val scaled = Bitmap.createScaledBitmap(
+                    bitmap, bitmap.width * scale, bitmap.height * scale, false
+                )
+                val drawable = BitmapDrawable(resources, scaled).also { it.setFilterBitmap(false) }
+                albumArt.scaleType = ImageView.ScaleType.CENTER
+                albumArt.setImageDrawable(drawable)
+            }
+        } else {
+            albumArt.visibility = View.GONE
+            pauseOverlay.visibility = View.GONE
+            btnPlay.visibility = View.VISIBLE
+        }
     }
 
     private fun togglePlayPause() {
@@ -151,9 +196,11 @@ class MainActivity : AppCompatActivity() {
         if (mp.isPlaying) {
             mp.pause()
             btnPlay.text = "▶"
+            if (albumArt.visibility == View.VISIBLE) pauseOverlay.visibility = View.VISIBLE
         } else {
             mp.start()
             btnPlay.text = "⏸"
+            pauseOverlay.visibility = View.GONE
         }
     }
 
