@@ -284,6 +284,13 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         handler.removeCallbacks(hideSystemUiRunnable)
+        mediaPlayer?.let {
+            if (it.isPlaying) {
+                it.pause()
+                btnPlay.text = "▶"
+                if (albumArt.visibility == View.VISIBLE) pauseOverlay.visibility = View.VISIBLE
+            }
+        }
     }
 
     // Block back button completely
