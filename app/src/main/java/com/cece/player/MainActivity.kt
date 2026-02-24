@@ -230,15 +230,8 @@ class MainActivity : AppCompatActivity() {
                 val fullPath = cursor.getString(pathCol) ?: ""
 
                 val uri = Uri.withAppendedPath(collection, id.toString())
-                val title = displayName.substringBeforeLast(".")
-
-                // Album = the folder immediately inside "Cece", or "Cece" if directly inside
-                val ceceSegment = fullPath.indexOf("/Cece/")
-                val album = if (ceceSegment >= 0) {
-                    val afterCece = fullPath.substring(ceceSegment + 6) // skip "/Cece/"
-                    val nextSlash = afterCece.indexOf('/')
-                    if (nextSlash > 0) afterCece.substring(0, nextSlash) else "Cece"
-                } else "Cece"
+                val title = TrackUtils.titleFromFilename(displayName)
+                val album = TrackUtils.albumFromPath(fullPath)
 
                 found.add(Track(uri, title, album, fullPath))
             }
@@ -315,7 +308,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun playNext() {
         if (tracks.isEmpty()) return
-        currentIndex = (currentIndex + 1) % tracks.size
+        currentIndex = TrackUtils.nextIndex(currentIndex, tracks.size)
         updateTrackInfo()
         startPlayback()
     }
@@ -327,7 +320,7 @@ class MainActivity : AppCompatActivity() {
         if (mp != null && mp.currentPosition > 3000) {
             mp.seekTo(0)
         } else {
-            currentIndex = (currentIndex - 1 + tracks.size) % tracks.size
+            currentIndex = TrackUtils.prevIndex(currentIndex, tracks.size)
             updateTrackInfo()
             startPlayback()
         }
