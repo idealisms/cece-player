@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg">#1A1A2E</color>
+    <color name="bg">#000000</color>
     <color name="btn_prev">#FF4F00</color>
     <color name="btn_play">#0F3460</color>
     <color name="btn_next">#FF4F00</color>
