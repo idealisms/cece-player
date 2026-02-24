@@ -1,6 +1,10 @@
 package com.cece.player
 
 import android.Manifest
+import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothProfile
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -9,6 +13,9 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.BatteryManager
@@ -48,6 +55,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnPrev: Button
     private lateinit var btnNext: Button
     private lateinit var batteryView: BatteryView
+    private lateinit var headphonesView: HeadphonesView
+
+    private val audioManager by lazy { getSystemService(AUDIO_SERVICE) as AudioManager }
 
     private val hideSystemUiRunnable = Runnable { hideSystemUI() }
 
@@ -57,6 +67,60 @@ class MainActivity : AppCompatActivity() {
             val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
             if (lvl >= 0 && scale > 0) batteryView.level = lvl * 100 / scale
         }
+    }
+
+    private val audioDeviceCallback = object : AudioDeviceCallback() {
+        override fun onAudioDevicesAdded(addedDevices: Array<AudioDeviceInfo>) {
+            checkBluetoothHeadphones()
+        }
+        override fun onAudioDevicesRemoved(removedDevices: Array<AudioDeviceInfo>) {
+            checkBluetoothHeadphones()
+        }
+    }
+
+    // Receives battery level updates from Bluetooth devices (API 33+)
+    private val btBatteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val level = intent.getIntExtra("android.bluetooth.device.extra.BATTERY_LEVEL", -1)
+            if (level >= 0) headphonesView.batteryLevel = level
+        }
+    }
+
+    private fun checkBluetoothHeadphones() {
+        val btConnected = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+            .any { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP }
+        headphonesView.visibility = if (btConnected) View.VISIBLE else View.GONE
+        if (!btConnected) {
+            headphonesView.batteryLevel = -1
+            return
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
+                == PackageManager.PERMISSION_GRANTED) {
+            fetchBtBattery()
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun fetchBtBattery() {
+        @Suppress("DEPRECATION")
+        BluetoothAdapter.getDefaultAdapter()?.getProfileProxy(
+            this,
+            object : BluetoothProfile.ServiceListener {
+                override fun onServiceConnected(profile: Int, proxy: BluetoothProfile) {
+                    @Suppress("UNCHECKED_CAST")
+                    val devices = proxy.connectedDevices as List<BluetoothDevice>
+                    val getBattery = try { BluetoothDevice::class.java.getMethod("getBatteryLevel") } catch (_: Exception) { null }
+                    val level = getBattery?.let { m ->
+                        devices.mapNotNull { m.invoke(it) as? Int }.firstOrNull { it >= 0 }
+                    } ?: -1
+                    runOnUiThread { headphonesView.batteryLevel = level }
+                    @Suppress("DEPRECATION")
+                    BluetoothAdapter.getDefaultAdapter()?.closeProfileProxy(BluetoothProfile.A2DP, proxy)
+                }
+                override fun onServiceDisconnected(profile: Int) {}
+            },
+            BluetoothProfile.A2DP
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -72,6 +136,7 @@ class MainActivity : AppCompatActivity() {
         btnPrev = findViewById(R.id.btnPrev)
         btnNext = findViewById(R.id.btnNext)
         batteryView = findViewById(R.id.batteryView)
+        headphonesView = findViewById(R.id.headphonesView)
 
         trackInfo.isSelected = true  // enables marquee scrolling
 
@@ -102,10 +167,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestPermissionsAndLoad() {
-        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            arrayOf(Manifest.permission.READ_MEDIA_AUDIO, Manifest.permission.READ_MEDIA_IMAGES)
-        } else {
-            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        val permissions = when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+                arrayOf(Manifest.permission.READ_MEDIA_AUDIO, Manifest.permission.READ_MEDIA_IMAGES,
+                    Manifest.permission.BLUETOOTH_CONNECT)
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.BLUETOOTH_CONNECT)
+            else ->
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
 
         val allGranted = permissions.all {
@@ -125,10 +194,14 @@ class MainActivity : AppCompatActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 1 && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            loadTracks()
-        } else {
-            trackInfo.text = "Storage permission needed"
+        if (requestCode == 1) {
+            val audioPerm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_EXTERNAL_STORAGE
+            if (ContextCompat.checkSelfPermission(this, audioPerm) == PackageManager.PERMISSION_GRANTED) {
+                loadTracks()
+            } else {
+                trackInfo.text = "Storage permission needed"
+            }
         }
     }
 
@@ -290,6 +363,12 @@ class MainActivity : AppCompatActivity() {
         hideSystemUI()
         try { startLockTask() } catch (_: Exception) {}
         registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        audioManager.registerAudioDeviceCallback(audioDeviceCallback, handler)
+        checkBluetoothHeadphones()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(btBatteryReceiver,
+                IntentFilter("android.bluetooth.device.action.BATTERY_LEVEL_CHANGED"))
+        }
         // Re-hide after any transient reveal
         window.decorView.setOnSystemUiVisibilityChangeListener {
             handler.removeCallbacks(hideSystemUiRunnable)
@@ -301,6 +380,10 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
         handler.removeCallbacks(hideSystemUiRunnable)
         try { unregisterReceiver(batteryReceiver) } catch (_: Exception) {}
+        audioManager.unregisterAudioDeviceCallback(audioDeviceCallback)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            try { unregisterReceiver(btBatteryReceiver) } catch (_: Exception) {}
+        }
         mediaPlayer?.let {
             if (it.isPlaying) {
                 it.pause()

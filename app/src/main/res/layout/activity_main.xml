@@ -110,4 +110,12 @@
         android:layout_gravity="top|start"
         android:layout_margin="8dp" />
 
+    <com.cece.player.HeadphonesView
+        android:id="@+id/headphonesView"
+        android:layout_width="60dp"
+        android:layout_height="46dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="8dp"
+        android:visibility="gone" />
+
 </FrameLayout>
