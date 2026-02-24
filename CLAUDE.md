@@ -19,7 +19,12 @@ export ANDROID_HOME=~/android-sdk && export JAVA_HOME=$(dirname $(dirname $(read
 /mnt/c/platform-tools/adb.exe install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-There are no automated tests in this project.
+**Run unit tests:**
+```bash
+export ANDROID_HOME=~/android-sdk && export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java)))) && ~/gradle/gradle-8.9/bin/gradle test --no-daemon
+```
+
+Pure-logic unit tests live in `app/src/test/java/com/cece/player/TrackUtilsTest.kt`. They cover `TrackUtils` (album name extraction, title extraction, track index wrap-around) and run on the JVM with no device needed.
 
 ## Architecture
 
@@ -43,11 +48,15 @@ This is a single-activity Android app (`MainActivity.kt`) — all logic lives th
 | File | Purpose |
 |------|---------|
 | `app/src/main/java/com/cece/player/MainActivity.kt` | All app logic |
+| `app/src/main/java/com/cece/player/TrackUtils.kt` | Pure functions: album/title parsing, index navigation |
+| `app/src/main/java/com/cece/player/BatteryView.kt` | Custom view: battery level indicator (top-left) |
+| `app/src/main/java/com/cece/player/HeadphonesView.kt` | Custom view: Bluetooth headphones indicator (top-right) |
 | `app/src/main/res/layout/activity_main.xml` | Three-column layout: prev / center / next |
-| `app/src/main/res/values/colors.xml` | Color palette (`#1A1A2E` bg, `#FF4F00` orange buttons) |
+| `app/src/main/res/values/colors.xml` | Color palette (`#000000` bg, `#FF4F00` orange buttons) |
 | `app/src/main/res/drawable/circle_btn.xml` | Prev/next button shape (orange circle) |
 | `app/src/main/res/drawable/circle_btn_play.xml` | Play button shape (dark blue circle) |
 | `app/src/main/AndroidManifest.xml` | `sensorLandscape`, `singleInstance`, permissions |
+| `app/src/test/java/com/cece/player/TrackUtilsTest.kt` | JUnit tests for TrackUtils |
 
 ## Target Device
 
