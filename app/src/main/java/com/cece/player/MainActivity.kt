@@ -1,12 +1,17 @@
 package com.cece.player
 
 import android.Manifest
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
 import android.media.MediaPlayer
 import android.net.Uri
+import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -42,8 +47,17 @@ class MainActivity : AppCompatActivity() {
     private lateinit var pauseOverlay: TextView
     private lateinit var btnPrev: Button
     private lateinit var btnNext: Button
+    private lateinit var batteryView: BatteryView
 
     private val hideSystemUiRunnable = Runnable { hideSystemUI() }
+
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val lvl = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            if (lvl >= 0 && scale > 0) batteryView.level = lvl * 100 / scale
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,6 +71,7 @@ class MainActivity : AppCompatActivity() {
         pauseOverlay = findViewById(R.id.pauseOverlay)
         btnPrev = findViewById(R.id.btnPrev)
         btnNext = findViewById(R.id.btnNext)
+        batteryView = findViewById(R.id.batteryView)
 
         trackInfo.isSelected = true  // enables marquee scrolling
 
@@ -274,6 +289,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         hideSystemUI()
         try { startLockTask() } catch (_: Exception) {}
+        registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         // Re-hide after any transient reveal
         window.decorView.setOnSystemUiVisibilityChangeListener {
             handler.removeCallbacks(hideSystemUiRunnable)
@@ -284,6 +300,7 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         handler.removeCallbacks(hideSystemUiRunnable)
+        try { unregisterReceiver(batteryReceiver) } catch (_: Exception) {}
         mediaPlayer?.let {
             if (it.isPlaying) {
                 it.pause()

@@ -1,100 +1,113 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/bg"
-    android:gravity="center">
-
-    <TextView
-        android:id="@+id/trackInfo"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="No tracks found"
-        android:textColor="@color/text_color"
-        android:textSize="20sp"
-        android:textStyle="bold"
-        android:gravity="center"
-        android:singleLine="true"
-        android:ellipsize="marquee"
-        android:marqueeRepeatLimit="marquee_forever"
-        android:focusable="true"
-        android:focusableInTouchMode="true"
-        android:paddingBottom="16dp"
-        android:paddingHorizontal="24dp" />
+    android:background="@color/bg">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="horizontal"
-        android:gravity="center"
-        android:paddingHorizontal="12dp"
-        android:paddingBottom="12dp">
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center">
 
-        <Button
-            android:id="@+id/btnPrev"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:layout_margin="8dp"
-            android:background="@drawable/circle_btn"
-            android:text="⏮"
-            android:textSize="48sp"
+        <TextView
+            android:id="@+id/trackInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="No tracks found"
             android:textColor="@color/text_color"
-            android:stateListAnimator="@null" />
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:singleLine="true"
+            android:ellipsize="marquee"
+            android:marqueeRepeatLimit="marquee_forever"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:paddingBottom="16dp"
+            android:paddingHorizontal="24dp" />
 
-        <FrameLayout
-            android:id="@+id/centerContainer"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
             android:layout_weight="1"
-            android:layout_margin="8dp"
-            android:clickable="true"
-            android:focusable="true">
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:paddingHorizontal="12dp"
+            android:paddingBottom="12dp">
 
             <Button
-                android:id="@+id/btnPlay"
-                android:layout_width="match_parent"
+                android:id="@+id/btnPrev"
+                android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:background="@drawable/circle_btn_play"
-                android:text="▶"
+                android:layout_weight="1"
+                android:layout_margin="8dp"
+                android:background="@drawable/circle_btn"
+                android:text="⏮"
                 android:textSize="48sp"
                 android:textColor="@color/text_color"
                 android:stateListAnimator="@null" />
 
-            <ImageView
-                android:id="@+id/albumArt"
-                android:layout_width="match_parent"
+            <FrameLayout
+                android:id="@+id/centerContainer"
+                android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:scaleType="fitCenter"
-                android:visibility="gone" />
+                android:layout_weight="1"
+                android:layout_margin="8dp"
+                android:clickable="true"
+                android:focusable="true">
 
-            <TextView
-                android:id="@+id/pauseOverlay"
-                android:layout_width="match_parent"
+                <Button
+                    android:id="@+id/btnPlay"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/circle_btn_play"
+                    android:text="▶"
+                    android:textSize="48sp"
+                    android:textColor="@color/text_color"
+                    android:stateListAnimator="@null" />
+
+                <ImageView
+                    android:id="@+id/albumArt"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="fitCenter"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/pauseOverlay"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="#88000000"
+                    android:text="⏸"
+                    android:textColor="#FFFFFF"
+                    android:textSize="96sp"
+                    android:gravity="center"
+                    android:visibility="gone" />
+
+            </FrameLayout>
+
+            <Button
+                android:id="@+id/btnNext"
+                android:layout_width="0dp"
                 android:layout_height="match_parent"
-                android:background="#88000000"
-                android:text="⏸"
-                android:textColor="#FFFFFF"
-                android:textSize="96sp"
-                android:gravity="center"
-                android:visibility="gone" />
+                android:layout_weight="1"
+                android:layout_margin="8dp"
+                android:background="@drawable/circle_btn"
+                android:text="⏭"
+                android:textSize="48sp"
+                android:textColor="@color/text_color"
+                android:stateListAnimator="@null" />
 
-        </FrameLayout>
-
-        <Button
-            android:id="@+id/btnNext"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:layout_margin="8dp"
-            android:background="@drawable/circle_btn"
-            android:text="⏭"
-            android:textSize="48sp"
-            android:textColor="@color/text_color"
-            android:stateListAnimator="@null" />
+        </LinearLayout>
 
     </LinearLayout>
 
-</LinearLayout>
+    <com.cece.player.BatteryView
+        android:id="@+id/batteryView"
+        android:layout_width="64dp"
+        android:layout_height="26dp"
+        android:layout_gravity="top|start"
+        android:layout_margin="8dp" />
+
+</FrameLayout>
