@@ -255,7 +255,7 @@ class MainActivity : AppCompatActivity() {
     private fun updateTrackInfo() {
         if (tracks.isEmpty()) return
         val t = tracks[currentIndex]
-        trackInfo.text = "${t.title}  —  ${t.album}"
+        trackInfo.text = t.title
     }
 
     private fun startPlayback() {
