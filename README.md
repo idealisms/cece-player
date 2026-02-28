@@ -13,6 +13,8 @@ A simple Android music player built for my 3-year-old daughter. Inspired by the 
 - **Scans for music automatically** — finds all audio files in any folder named `Cece` on the device. Sub-folders are used as album names (e.g. `Cece/Frozen/` → album "Frozen")
 - **Pixel art track icons** — if a `.png` with the same name as the audio file exists alongside it, it's shown in the center using nearest-neighbor scaling to keep the pixel art sharp
 - **Three big buttons** — previous track, play/pause, next track. Tapping the track icon also toggles play/pause
+- **Battery indicator** — top-left corner shows device battery level
+- **Bluetooth headphones indicator** — top-right corner shows a headphones icon with the headphones battery level when connected; volume is automatically capped at 50% to protect little ears
 - **Landscape only** — locked to landscape in both orientations
 - **Hard to exit:**
   - Back button is disabled
