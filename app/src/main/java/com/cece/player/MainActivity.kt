@@ -59,6 +59,9 @@ class MainActivity : AppCompatActivity() {
 
     private val audioManager by lazy { getSystemService(AUDIO_SERVICE) as AudioManager }
 
+    private var btConnected = false
+    private val BT_VOLUME_CAP = 0.5f
+
     private val hideSystemUiRunnable = Runnable { hideSystemUI() }
 
     private val batteryReceiver = object : BroadcastReceiver() {
@@ -87,9 +90,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkBluetoothHeadphones() {
-        val btConnected = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+        btConnected = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
             .any { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP }
         headphonesView.visibility = if (btConnected) View.VISIBLE else View.GONE
+        val vol = if (btConnected) BT_VOLUME_CAP else 1f
+        mediaPlayer?.setVolume(vol, vol)
         if (!btConnected) {
             headphonesView.batteryLevel = -1
             return
@@ -256,9 +261,11 @@ class MainActivity : AppCompatActivity() {
     private fun startPlayback() {
         if (tracks.isEmpty()) return
         mediaPlayer?.release()
+        val vol = if (btConnected) BT_VOLUME_CAP else 1f
         mediaPlayer = MediaPlayer().apply {
             setDataSource(applicationContext, tracks[currentIndex].uri)
             prepare()
+            setVolume(vol, vol)
             start()
             setOnCompletionListener { playNext() }
         }
