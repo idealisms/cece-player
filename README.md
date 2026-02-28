@@ -4,9 +4,9 @@ A simple Android music player built for my 3-year-old daughter. Inspired by the 
 
 ## Screenshots
 
-![Now playing with pixel art track icon](Screenshot_20260222_135225_Cece%20Player.jpg)
+![Now playing with pixel art track icon](Screenshot.jpg)
 
-![Screen pinning active — navigation is locked](Screenshot_20260222_135253_Cece%20Player.jpg)
+![Screen pinning active — navigation is locked](Screenshot-app-mode.jpg)
 
 ## Features
 
