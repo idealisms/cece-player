@@ -18,12 +18,14 @@ import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
+import android.net.wifi.WifiManager
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewTreeObserver
 import android.view.WindowInsets
@@ -36,6 +38,19 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
+import androidx.mediarouter.app.MediaRouteButton
+import androidx.mediarouter.media.MediaRouteSelector
+import androidx.mediarouter.media.MediaRouter
+import com.google.android.gms.cast.CastMediaControlIntent
+import com.google.android.gms.cast.MediaInfo
+import com.google.android.gms.cast.MediaMetadata
+import com.google.android.gms.cast.framework.CastContext
+import com.google.android.gms.cast.framework.CastSession
+import com.google.android.gms.cast.framework.SessionManagerListener
+import com.google.android.gms.cast.MediaLoadRequestData
+import com.google.android.gms.cast.MediaStatus
+import com.google.android.gms.cast.framework.media.RemoteMediaClient
 import java.io.File
 
 data class Track(val uri: Uri, val title: String, val album: String, val dataPath: String)
@@ -56,11 +71,28 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnNext: Button
     private lateinit var batteryView: BatteryView
     private lateinit var headphonesView: HeadphonesView
+    private lateinit var btnCast: MediaRouteButton
 
     private val audioManager by lazy { getSystemService(AUDIO_SERVICE) as AudioManager }
 
     private var btConnected = false
     private val BT_VOLUME_CAP = 0.5f
+
+    private var castSettings: CastSettings? = null
+    private var castContext: CastContext? = null
+    private var httpServer: LocalHttpServer? = null
+    private var isCasting = false
+
+    private val remoteMediaClientCallback = object : RemoteMediaClient.Callback() {
+        override fun onStatusUpdated() {
+            val client = castContext?.sessionManager?.currentCastSession?.remoteMediaClient ?: return
+            val status = client.mediaStatus ?: return
+            if (status.playerState == MediaStatus.PLAYER_STATE_IDLE &&
+                status.idleReason == MediaStatus.IDLE_REASON_FINISHED) {
+                runOnUiThread { playNext() }
+            }
+        }
+    }
 
     private val hideSystemUiRunnable = Runnable { hideSystemUI() }
 
@@ -89,10 +121,72 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val mediaRouterCallback = object : MediaRouter.Callback() {
+        override fun onRouteAdded(router: MediaRouter, route: MediaRouter.RouteInfo) {
+            updateCastButton()
+        }
+        override fun onRouteRemoved(router: MediaRouter, route: MediaRouter.RouteInfo) {
+            updateCastButton()
+        }
+        override fun onRouteChanged(router: MediaRouter, route: MediaRouter.RouteInfo) {
+            updateCastButton()
+        }
+    }
+
+    private val sessionManagerListener = object : SessionManagerListener<CastSession> {
+        override fun onSessionStarted(session: CastSession, sessionId: String) {
+            isCasting = true
+            val savedPosition = mediaPlayer?.currentPosition ?: 0
+            mediaPlayer?.pause()
+            httpServer = LocalHttpServer(tracks).also { it.start() }
+            session.remoteMediaClient?.registerCallback(remoteMediaClientCallback)
+            loadTrackOnCast(currentIndex, savedPosition)
+            updateCastButton()
+        }
+
+        override fun onSessionEnded(session: CastSession, error: Int) {
+            session.remoteMediaClient?.unregisterCallback(remoteMediaClientCallback)
+            isCasting = false
+            httpServer?.stop()
+            httpServer = null
+            startPlayback()
+            updateCastButton()
+        }
+
+        override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) {
+            isCasting = true
+            val savedPosition = mediaPlayer?.currentPosition ?: 0
+            mediaPlayer?.pause()
+            httpServer = LocalHttpServer(tracks).also { it.start() }
+            session.remoteMediaClient?.registerCallback(remoteMediaClientCallback)
+            loadTrackOnCast(currentIndex, savedPosition)
+            updateCastButton()
+        }
+
+        override fun onSessionSuspended(session: CastSession, reason: Int) {
+            isCasting = false
+            updateCastButton()
+        }
+
+        override fun onSessionStartFailed(session: CastSession, error: Int) {
+            isCasting = false
+            updateCastButton()
+        }
+
+        override fun onSessionResumeFailed(session: CastSession, error: Int) {
+            isCasting = false
+            updateCastButton()
+        }
+
+        override fun onSessionEnding(session: CastSession) {}
+        override fun onSessionStarting(session: CastSession) {}
+        override fun onSessionResuming(session: CastSession, sessionId: String) {}
+    }
+
     private fun checkBluetoothHeadphones() {
         btConnected = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
             .any { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP }
-        headphonesView.visibility = if (btConnected) View.VISIBLE else View.GONE
+        updateCastButton()
         val vol = if (btConnected) BT_VOLUME_CAP else 1f
         mediaPlayer?.setVolume(vol, vol)
         if (!btConnected) {
@@ -103,6 +197,19 @@ class MainActivity : AppCompatActivity() {
                 == PackageManager.PERMISSION_GRANTED) {
             fetchBtBattery()
         }
+    }
+
+    private fun updateCastButton() {
+        val settings = castSettings
+        if (settings == null) {
+            headphonesView.isVisible = btConnected
+            return
+        }
+        val routes = MediaRouter.getInstance(this).routes
+        val targetVisible = routes.any { it.name.contains(settings.name, ignoreCase = true) }
+        val showCast = (targetVisible && !btConnected) || isCasting
+        btnCast.isVisible = showCast
+        headphonesView.isVisible = btConnected && !isCasting
     }
 
     @SuppressLint("MissingPermission")
@@ -142,6 +249,7 @@ class MainActivity : AppCompatActivity() {
         btnNext = findViewById(R.id.btnNext)
         batteryView = findViewById(R.id.batteryView)
         headphonesView = findViewById(R.id.headphonesView)
+        btnCast = findViewById(R.id.btnCast)
 
         trackInfo.isSelected = true  // enables marquee scrolling
 
@@ -167,6 +275,30 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
+
+        castSettings = loadCastSettings(this)
+        if (castSettings != null) {
+            castContext = try { CastContext.getSharedInstance(this) } catch (e: Exception) { null }
+            castContext?.let { ctx ->
+                val selector = MediaRouteSelector.Builder()
+                    .addControlCategory(CastMediaControlIntent.categoryForCast(
+                        CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID))
+                    .build()
+                btnCast.routeSelector = selector
+                // Intercept touches to auto-connect instead of showing route picker dialog
+                btnCast.setOnTouchListener { v, event ->
+                    when (event.action) {
+                        MotionEvent.ACTION_DOWN -> { v.isPressed = true; true }
+                        MotionEvent.ACTION_UP -> { v.isPressed = false; handleCastButtonClick(); true }
+                        MotionEvent.ACTION_CANCEL -> { v.isPressed = false; true }
+                        else -> false
+                    }
+                }
+                ctx.sessionManager.addSessionManagerListener(sessionManagerListener, CastSession::class.java)
+                MediaRouter.getInstance(this).addCallback(selector, mediaRouterCallback,
+                    MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY)
+            }
+        }
 
         requestPermissionsAndLoad()
     }
@@ -301,6 +433,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun togglePlayPause() {
+        if (isCasting) {
+            val client = castContext?.sessionManager?.currentCastSession?.remoteMediaClient ?: return
+            client.togglePlayback()
+            return
+        }
         val mp = mediaPlayer ?: return
         if (mp.isPlaying) {
             mp.pause()
@@ -317,11 +454,23 @@ class MainActivity : AppCompatActivity() {
         if (tracks.isEmpty()) return
         currentIndex = TrackUtils.nextIndex(currentIndex, tracks.size)
         updateTrackInfo()
-        startPlayback()
+        if (isCasting) {
+            updateAlbumArt(isPlaying = true)
+            loadTrackOnCast(currentIndex, 0)
+        } else {
+            startPlayback()
+        }
     }
 
     private fun playPrev() {
         if (tracks.isEmpty()) return
+        if (isCasting) {
+            currentIndex = TrackUtils.prevIndex(currentIndex, tracks.size)
+            updateTrackInfo()
+            updateAlbumArt(isPlaying = true)
+            loadTrackOnCast(currentIndex, 0)
+            return
+        }
         // If more than 3s into track, restart it; otherwise go to previous
         val mp = mediaPlayer
         if (mp != null && mp.currentPosition > 3000) {
@@ -331,6 +480,41 @@ class MainActivity : AppCompatActivity() {
             updateTrackInfo()
             startPlayback()
         }
+    }
+
+    private fun handleCastButtonClick() {
+        if (isCasting) {
+            castContext?.sessionManager?.endCurrentSession(true)
+        } else {
+            val settings = castSettings ?: return
+            val route = MediaRouter.getInstance(this).routes
+                .firstOrNull { it.name.contains(settings.name, ignoreCase = true) }
+            if (route != null) MediaRouter.getInstance(this).selectRoute(route)
+        }
+    }
+
+    private fun loadTrackOnCast(index: Int, positionMs: Int) {
+        val client = castContext?.sessionManager?.currentCastSession?.remoteMediaClient ?: return
+        val track = tracks.getOrNull(index) ?: return
+        val ip = getLocalIpAddress()
+        val mediaInfo = MediaInfo.Builder("http://$ip:8765/track/$index")
+            .setContentType("audio/mpeg")
+            .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
+            .setMetadata(MediaMetadata(MediaMetadata.MEDIA_TYPE_MUSIC_TRACK).apply {
+                putString(MediaMetadata.KEY_TITLE, track.title)
+            }).build()
+        client.load(MediaLoadRequestData.Builder()
+            .setMediaInfo(mediaInfo)
+            .setAutoplay(true)
+            .setCurrentTime(positionMs.toLong())
+            .build())
+    }
+
+    @Suppress("DEPRECATION")
+    private fun getLocalIpAddress(): String {
+        val wm = applicationContext.getSystemService(WIFI_SERVICE) as WifiManager
+        val ip = wm.connectionInfo.ipAddress
+        return "${ip and 0xff}.${ip shr 8 and 0xff}.${ip shr 16 and 0xff}.${ip shr 24 and 0xff}"
     }
 
     private fun hideSystemUI() {
@@ -384,11 +568,13 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             try { unregisterReceiver(btBatteryReceiver) } catch (_: Exception) {}
         }
-        mediaPlayer?.let {
-            if (it.isPlaying) {
-                it.pause()
-                btnPlay.text = "▶"
-                if (albumArt.visibility == View.VISIBLE) pauseOverlay.visibility = View.VISIBLE
+        if (!isCasting) {
+            mediaPlayer?.let {
+                if (it.isPlaying) {
+                    it.pause()
+                    btnPlay.text = "▶"
+                    if (albumArt.visibility == View.VISIBLE) pauseOverlay.visibility = View.VISIBLE
+                }
             }
         }
     }
@@ -401,6 +587,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        castContext?.sessionManager?.removeSessionManagerListener(sessionManagerListener, CastSession::class.java)
+        if (castSettings != null) {
+            MediaRouter.getInstance(this).removeCallback(mediaRouterCallback)
+        }
+        httpServer?.stop()
         mediaPlayer?.release()
         mediaPlayer = null
         handler.removeCallbacksAndMessages(null)

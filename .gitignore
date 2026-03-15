@@ -13,3 +13,6 @@ local.properties
 
 # Gradle wrapper jar (downloaded automatically)
 gradle/wrapper/gradle-wrapper.jar
+
+# Cast device settings (machine-specific)
+app/src/main/assets/cast_settings.txt

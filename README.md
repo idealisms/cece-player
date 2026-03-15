@@ -15,6 +15,7 @@ A simple Android music player built for my 3-year-old daughter. Inspired by the 
 - **Three big buttons** — previous track, play/pause, next track. Tapping the track icon also toggles play/pause
 - **Battery indicator** — top-left corner shows device battery level
 - **Bluetooth headphones indicator** — top-right corner shows a headphones icon with the headphones battery level when connected; volume is automatically capped at 50% to protect little ears
+- **Google Cast support** — tap the Cast button (top-right) to stream audio to a Google Nest Mini or other Cast device on the same WiFi network; prev/next and track icons update in sync; tracks advance automatically when one finishes
 - **Landscape only** — locked to landscape in both orientations
 - **Hard to exit:**
   - Back button is disabled
@@ -40,6 +41,16 @@ Music/
     Moana/
       01 Tulou Tagaloa.mp3
 ```
+
+### Cast (optional)
+
+To enable casting, create `app/src/main/assets/cast_settings.txt` (gitignored) with the name of your Cast device:
+
+```
+name=cece
+```
+
+The app matches any Cast device whose name contains this string (case-insensitive). When a matching device is found on the network, a Cast button appears in the top-right corner. Tap it to connect; tap again to disconnect and resume local playback.
 
 ### Screen pinning
 
